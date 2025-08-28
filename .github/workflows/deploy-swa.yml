@@ -2,21 +2,24 @@ name: Deploy to Azure Static Web Apps (Production)
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]        # your repo uses master
   workflow_dispatch:
 
 permissions:
   contents: read
 
 env:
-  APP_LOCATION: "/"
-  API_LOCATION: ""
-  OUTPUT_LOCATION: "build"  # CRA uses build/
-  NODE_VERSION: "18.x"      # older CRA works best on Node 18
+  APP_LOCATION: "/"             # package.json is at repo root
+  API_LOCATION: ""              # no API/backend
+  OUTPUT_LOCATION: "build"      # CRA outputs to build/
+  NODE_VERSION: "18.x"          # CRA is happiest on Node 18
+  # Prevent CRA from failing on warnings in CI:
+  CI: "false"
 
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,14 +30,20 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
 
-      - name: Install dependencies
+      # Some older templates still use npm audit/fund prompts; disable to keep logs clean
+      - name: Prepare npm config
         run: |
           npm config set fund false
           npm config set audit false
-          npm install --legacy-peer-deps
         working-directory: ${{ env.APP_LOCATION }}
 
+      # No lockfile in repo -> use npm install (not npm ci).
+      # legacy-peer-deps avoids old CRA peer resolution errors.
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+        working-directory: ${{ env.APP_LOCATION }}
 
+      # Build the app. CI=false (from env) ensures CRA warnings don't break the build.
       - name: Build
         run: npm run build
         working-directory: ${{ env.APP_LOCATION }}
@@ -47,4 +56,4 @@ jobs:
           app_location: ${{ env.APP_LOCATION }}
           api_location: ${{ env.API_LOCATION }}
           output_location: ${{ env.OUTPUT_LOCATION }}
-          production_branch: "main"
+          production_branch: "master"    # match your default branch
