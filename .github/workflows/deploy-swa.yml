@@ -27,33 +27,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
+          cache: "yarn"
 
-      # ✅ Pin npm 9 to avoid npm@10 'idealTree' issue
-      - name: Downgrade npm to v9
-        run: |
-          npm -v
-          npm i -g npm@9
-          npm -v
-        working-directory: ${{ env.APP_LOCATION }}
+      - name: Install Yarn
+        run: npm install -g yarn
 
-      # ✅ Clean slate install: new cache path, clear cache, remove any leftovers
-      - name: Prepare npm cache and workspace
-        run: |
-          npm config set fund false
-          npm config set audit false
-          npm config set cache "${{ runner.temp }}/npm-cache" --global
-          npm cache verify
-          rm -rf node_modules package-lock.json
-        working-directory: ${{ env.APP_LOCATION }}
-
-      # ✅ Install with legacy peer deps (old CRA templates)
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps --no-audit --no-fund
+      - name: Install dependencies with Yarn
+        run: yarn install --ignore-engines --frozen-lockfile || yarn install --ignore-engines
         working-directory: ${{ env.APP_LOCATION }}
 
       - name: Build
-        run: npm run build
+        run: yarn build
         working-directory: ${{ env.APP_LOCATION }}
 
       - name: Deploy to Azure Static Web Apps
