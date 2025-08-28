@@ -1,20 +1,3 @@
-name: Deploy to Azure Static Web Apps (Production)
-
-on:
-  push:
-    branches: [ master ]
-  workflow_dispatch:
-
-jobs:
-  build_and_deploy:
-    runs-on: ubuntu-latest
-    env:
-      APP_LOCATION: "/"
-      API_LOCATION: ""
-      OUTPUT_LOCATION: "build"
-      NODE_VERSION: "18.x"
-      CI: "false"   # CRA: don't fail on warnings
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,16 +7,17 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # 🔧 Workaround npm 10 bug: use npm 9, clean cache & workspace
-      - name: Pin npm 9 and clean cache
+      # ✅ Pin npm 9 and move cache to a temp dir (avoid ENOTEMPTY)
+      - name: Pin npm 9 and set temp cache
         run: |
           npm -v
           npm i -g npm@9
           npm -v
           npm config set fund false
           npm config set audit false
-          npm cache clean --force
-          rm -rf node_modules package-lock.json
+          npm config set cache "${{ runner.temp }}/npm-cache" --global
+          npm cache verify
+          rm -rf node_modules package-lock.json || true
         working-directory: ${{ env.APP_LOCATION }}
 
       - name: Install dependencies (npm 9)
