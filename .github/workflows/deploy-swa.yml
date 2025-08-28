@@ -27,9 +27,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
 
-      - name: Install dependencies (clean)
-        run: npm ci
+      - name: Install dependencies
+        run: |
+          npm config set fund false
+          npm config set audit false
+          npm install --legacy-peer-deps
         working-directory: ${{ env.APP_LOCATION }}
+
 
       - name: Build
         run: npm run build
