@@ -2,19 +2,18 @@ name: Deploy to Azure Static Web Apps (Production)
 
 on:
   push:
-    branches: [ master ]        # your repo uses master
+    branches: [ master ]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 env:
-  APP_LOCATION: "/"             # package.json is at repo root
-  API_LOCATION: ""              # no API/backend
-  OUTPUT_LOCATION: "build"      # CRA outputs to build/
-  NODE_VERSION: "18.x"          # CRA is happiest on Node 18
-  # Prevent CRA from failing on warnings in CI:
-  CI: "false"
+  APP_LOCATION: "/"
+  API_LOCATION: ""
+  OUTPUT_LOCATION: "build"
+  NODE_VERSION: "18.x"
+  CI: "false"   # prevent CRA warnings from failing the build
 
 jobs:
   build_and_deploy:
@@ -30,20 +29,29 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
 
-      # Some older templates still use npm audit/fund prompts; disable to keep logs clean
-      - name: Prepare npm config
+      # ✅ Pin npm 9 to avoid npm@10 'idealTree' issue
+      - name: Downgrade npm to v9
+        run: |
+          npm -v
+          npm i -g npm@9
+          npm -v
+        working-directory: ${{ env.APP_LOCATION }}
+
+      # ✅ Clean slate install: new cache path, clear cache, remove any leftovers
+      - name: Prepare npm cache and workspace
         run: |
           npm config set fund false
           npm config set audit false
+          npm config set cache "${{ runner.temp }}/npm-cache" --global
+          npm cache verify
+          rm -rf node_modules package-lock.json
         working-directory: ${{ env.APP_LOCATION }}
 
-      # No lockfile in repo -> use npm install (not npm ci).
-      # legacy-peer-deps avoids old CRA peer resolution errors.
+      # ✅ Install with legacy peer deps (old CRA templates)
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps --no-audit --no-fund
         working-directory: ${{ env.APP_LOCATION }}
 
-      # Build the app. CI=false (from env) ensures CRA warnings don't break the build.
       - name: Build
         run: npm run build
         working-directory: ${{ env.APP_LOCATION }}
@@ -52,8 +60,8 @@ jobs:
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          action: "upload"
+          action: upload
           app_location: ${{ env.APP_LOCATION }}
           api_location: ${{ env.API_LOCATION }}
           output_location: ${{ env.OUTPUT_LOCATION }}
-          production_branch: "master"    # match your default branch
+          production_branch: "master"
