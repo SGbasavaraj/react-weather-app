@@ -9,23 +9,23 @@ jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     env:
-      NODE_VERSION: "18.x"      # CRA works best on Node 18
-      APP_LOCATION: "/"         # repo root for SWA upload
+      NODE_VERSION: "18.x"      # CRA is stable on Node 18
+      APP_LOCATION: "."         # repo root (use "." not "/")
       API_LOCATION: ""          # no API/backend
       OUTPUT_LOCATION: "build"  # CRA outputs to build/
-      CI: "false"               # don't fail on warnings in CI
+      CI: "false"               # don't fail on warnings
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node ${{ env.NODE_VERSION }}
+      - name: Use Node
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # Pin npm 9 and isolate cache to avoid npm@10 "idealTree" and cache ENOTEMPTY issues
-      - name: Pin npm 9 and set temp cache
+      # Use npm 9 (avoids npm@10 idealTree issues) and isolate cache
+      - name: Prepare npm (pin v9 + temp cache)
         run: |
           npm -v
           npm i -g npm@9
@@ -36,12 +36,22 @@ jobs:
           npm cache verify
           rm -rf node_modules package-lock.json || true
 
+      # Install project deps
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
+        working-directory: ${{ env.APP_LOCATION }}
 
+      # 🔧 Patch: ensure Ajv v8 + ajv-keywords v5 are present for CRA toolchain
+      - name: Patch ajv toolchain
+        run: npm install ajv@^8 ajv-keywords@^5 --no-save
+        working-directory: ${{ env.APP_LOCATION }}
+
+      # Build the app
       - name: Build
         run: npm run build
+        working-directory: ${{ env.APP_LOCATION }}
 
+      # Deploy to Azure Static Web Apps
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
         with:
